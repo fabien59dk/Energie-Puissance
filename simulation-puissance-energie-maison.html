@@ -841,7 +841,12 @@ canvas#graph{width:100%; height:210px; display:block; border-radius:10px; backgr
           if(advancedPowerMode){
             const spanCphi = document.createElement('span');
             spanCphi.style.color = 'var(--text-dim)';
-            spanCphi.textContent = 'cos φ ' + cphi.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2});
+            let cphiText = 'cos φ ' + cphi.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2});
+            if(slot.on){
+              const Sslot = apparentVA(slot);
+              cphiText += ' · S≈' + Math.round(Sslot).toLocaleString('fr-FR') + ' VA';
+            }
+            spanCphi.textContent = cphiText;
             etaRow.appendChild(spanCphi);
           }
         }
