@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Puissance et énergie dans la maison</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#10131f;
+  --panel:#171b2c;
+  --panel-2:#1e2339;
+  --grid-line:#242a45;
+  --border:#2c3252;
+  --text:#eef0fb;
+  --text-dim:#8890b5;
+  --wire-off:#3a4066;
+  --wire-load:#ffb445;
+  --wire-gen:#42d6c4;
+  --useful:#7ed957;
+  --lost:#ff7a59;
+  --danger:#ff6b6b;
+  --flow-duration: 0.6s;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --bg:#eef0f7; --panel:#ffffff; --panel-2:#f5f6fb;
+    --grid-line:#e3e6f2; --border:#dcdfef;
+    --text:#1a1e33; --text-dim:#666f97; --wire-off:#c7cce3;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#10131f; --panel:#171b2c; --panel-2:#1e2339; --grid-line:#242a45;
+  --border:#2c3252; --text:#eef0fb; --text-dim:#8890b5; --wire-off:#3a4066;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;background:var(--bg);}
+body{
+  font-family:'Space Grotesk', system-ui, sans-serif;
+  color:var(--text);
+  padding:18px;
+  display:flex;
+  justify-content:center;
+}
+.wrap{width:100%; max-width:1220px; display:flex; flex-direction:column; gap:14px;}
+
+.top-row{
+  display:grid;
+  grid-template-columns: 2fr 1fr;
+  gap:14px;
+  align-items:start;
+}
+@media (max-width:860px){
+  .top-row{grid-template-columns:1fr;}
+}
+.right-col{display:flex; flex-direction:column; gap:14px;}
+
+.card{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:16px 18px;
+}
+.eyebrow{font-size:11px; color:var(--text-dim); letter-spacing:.02em; margin:0 0 10px 0;}
+
+/* ---------- Scene ---------- */
+.scene-wrap{
+  --panel:#171b2c;
+  --panel-2:#1e2339;
+  --text:#eef0fb;
+  --text-dim:#8890b5;
+  --border:#2c3252;
+  --wire-off:#3a4066;
+  --grid-line:#242a45;
+  background-color:#000000;
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 28px 28px;
+  border-radius:10px;
+  padding:4px;
+}
+#scene{width:100%; height:auto; display:block; overflow:visible;}
+.wire{fill:none; stroke:var(--wire-off); stroke-width:4.5; stroke-linecap:round; transition:stroke .2s;}
+.wire.load-on{stroke:var(--wire-load);}
+.wire.gen-on{stroke:var(--wire-gen);}
+.flowdash{stroke-dasharray:1.5 12;}
+.flowdash.run{animation:dash var(--flow-duration,.6s) linear infinite;}
+@keyframes dash{to{stroke-dashoffset:-27;}}
+
+.node-fill{fill:var(--panel-2); stroke:var(--border); stroke-width:1.5;}
+.meter-face{fill:var(--panel-2); stroke:var(--border); stroke-width:2;}
+.meter-tick{stroke:var(--text-dim); stroke-width:1.3;}
+.meter-needle{stroke:var(--wire-load); stroke-width:2.5; stroke-linecap:round;}
+.meter-needle.neg{stroke:var(--wire-gen);}
+
+.small-label{font-family:'Space Grotesk',sans-serif; font-size:11.5px; fill:var(--text-dim);}
+.mono-label{font-family:'JetBrains Mono',monospace; font-size:10.5px; fill:var(--text-dim);}
+.node-title{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:12.5px; fill:var(--text);}
+
+.rocker-track{cursor:pointer;}
+.rocker-body{fill:var(--panel-2); stroke:var(--border); stroke-width:1.5;}
+.rocker-knob{fill:var(--wire-off); transition: cx .18s ease, fill .18s ease;}
+.rocker-knob.on{fill:var(--wire-load);}
+.rocker-knob.on.gen{fill:var(--wire-gen);}
+
+.icon{color:var(--text-dim); transition:color .2s;}
+.icon.on{color:var(--text);}
+
+/* ---------- Load slot boxes (HTML overlay controls) ---------- */
+.slot-box{
+  background:var(--panel-2);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:6px 8px;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  width:100%;
+  height:100%;
+  font-family:'Space Grotesk',sans-serif;
+}
+.slot-box select{
+  width:100%;
+  background:var(--panel);
+  color:var(--text);
+  border:1px solid var(--border);
+  border-radius:6px;
+  padding:4px 5px;
+  font-family:'Space Grotesk',sans-serif;
+  font-size:11.5px;
+}
+.slot-readout{
+  display:flex; align-items:center; justify-content:space-between;
+  font-family:'JetBrains Mono',monospace;
+  font-size:12px;
+}
+.slot-readout .w-val{font-weight:700;}
+.slot-readout .w-val.off{color:var(--text-dim); font-weight:500;}
+.slot-readout .w-val.gen{color:var(--wire-gen);}
+.slot-readout .w-val.load{color:var(--wire-load);}
+.slot-readout .w-val.cut{color:var(--danger); font-weight:700;}
+button.ctrl:disabled{opacity:0.4; cursor:not-allowed;}
+button.ctrl:disabled:hover{border-color:var(--border);}
+.breaker-tripped .node-fill{fill:rgba(255,107,107,0.18); stroke:var(--danger);}
+.adjust-row{display:flex; align-items:center; gap:6px; justify-content:flex-end;}
+.adjust-row button{
+  width:22px; height:22px; border-radius:5px; border:1px solid var(--border);
+  background:var(--panel); color:var(--text); cursor:pointer; font-size:13px; line-height:1;
+}
+.adjust-row button:hover{border-color:var(--wire-load);}
+.adjust-row span{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-dim); min-width:20px; text-align:center;}
+
+.eta-row{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:2px 8px; font-size:9.5px; color:var(--text-dim); font-family:'JetBrains Mono',monospace;}
+.eta-bar{display:flex; width:100%; height:6px; border-radius:3px; overflow:hidden; background:var(--panel); margin:2px 0;}
+.eta-bar .seg-useful{background:var(--useful); height:100%;}
+.eta-bar .seg-lost{background:var(--lost); height:100%;}
+
+.scene-grid{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:0;
+}
+
+/* ---------- Controls row ---------- */
+.controls-row{display:flex; flex-wrap:wrap; gap:10px; align-items:center;}
+button.ctrl{
+  background:var(--panel-2); color:var(--text); border:1px solid var(--border);
+  border-radius:8px; padding:8px 14px; font-family:'Space Grotesk',sans-serif;
+  font-weight:600; font-size:12.5px; cursor:pointer; transition:border-color .15s, background .15s;
+}
+button.ctrl:hover{border-color:var(--wire-load);}
+button.ctrl.active{background:var(--wire-load); color:#1a1e33; border-color:var(--wire-load);}
+select.ctrl-select{
+  background:var(--panel-2); color:var(--text); border:1px solid var(--border);
+  border-radius:8px; padding:8px 10px; font-family:'Space Grotesk',sans-serif; font-size:12.5px;
+}
+.cost-row{display:flex; align-items:center; gap:10px; margin-left:auto;}
+.cost-row label{font-size:12.5px; color:var(--text-dim); white-space:nowrap;}
+input[type=range]{-webkit-appearance:none; width:140px; height:5px; border-radius:4px; background:var(--wire-off); outline:none;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:16px; height:16px; border-radius:50%; background:var(--wire-load); cursor:pointer; border:2px solid var(--panel);}
+input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%; background:var(--wire-load); border:2px solid var(--panel); cursor:pointer;}
+.cost-val{font-family:'JetBrains Mono',monospace; font-size:12.5px; min-width:60px;}
+
+/* ---------- Meter readout ---------- */
+.meter-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:10px;}
+.meter-cell{background:var(--panel-2); border:1px solid var(--border); border-radius:10px; padding:10px 12px;}
+.meter-cell .k{font-size:11px; color:var(--text-dim);}
+.meter-cell .v{font-family:'JetBrains Mono',monospace; font-size:20px; font-weight:700; margin-top:2px;}
+.meter-cell .v.load{color:var(--wire-load);}
+.meter-cell .v.gen{color:var(--wire-gen);}
+
+/* ---------- Graph ---------- */
+canvas#graph{width:100%; height:210px; display:block; border-radius:10px; background:var(--panel-2); border:1px solid var(--border);}
+.graph-legend{display:flex; gap:16px; margin-top:8px; font-size:11px; color:var(--text-dim);}
+.dot{display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="top-row">
+  <div class="card">
+    <p class="eyebrow">Schéma du circuit</p>
+    <div class="scene-wrap">
+      <svg id="scene" viewBox="0 0 940 700" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+    <div id="trip-banner" style="display:none; margin-top:10px; padding:10px 12px; border-radius:9px; background:rgba(255,107,107,0.12); border:1px solid var(--danger); color:var(--danger); font-size:12.5px; font-weight:600;"></div>
+  </div>
+
+  <div class="right-col">
+  <div class="card">
+    <p class="eyebrow">Compteur</p>
+    <div class="meter-grid">
+      <div class="meter-cell">
+        <div class="k" id="label-power">Puissance consommée</div>
+        <div class="v" id="v-power">0 W</div>
+      </div>
+      <div class="meter-cell" id="cell-apparent">
+        <div class="k">Puissance apparente (S)</div>
+        <div class="v" id="v-apparent">0,00 kVA</div>
+      </div>
+      <div class="meter-cell">
+        <div class="k">Énergie cumulée</div>
+        <div class="v" id="v-energy">0,000 kWh</div>
+      </div>
+      <div class="meter-cell">
+        <div class="k">Facture</div>
+        <div class="v" id="v-cost">0,00 €</div>
+      </div>
+      <div class="meter-cell">
+        <div class="k">Temps simulé</div>
+        <div class="v" style="display:flex;align-items:center;gap:7px;">
+          <svg id="daynight-icon" width="18" height="18" viewBox="0 0 16 16" style="flex:none;"></svg>
+          <span id="v-time">Jour 1, 00:00</span>
+        </div>
+      </div>
+      <div class="meter-cell">
+        <div class="k">Énergie utile (cumul)</div>
+        <div class="v" id="v-useful" style="color:var(--useful);">0,000 kWh</div>
+      </div>
+      <div class="meter-cell">
+        <div class="k">Énergie perdue (cumul)</div>
+        <div class="v" id="v-lost" style="color:var(--lost);">0,000 kWh</div>
+      </div>
+    </div>
+    <p style="font-size:10.5px;color:var(--text-dim);margin:8px 0 0 0;">Utile / perdue : uniquement pour les appareils consommateurs (hors production solaire).</p>
+  </div>
+
+  <div class="card">
+    <p class="eyebrow">Commandes</p>
+    <div class="controls-row" style="flex-direction:column; align-items:stretch;">
+      <div style="display:flex; flex-wrap:wrap; gap:8px;">
+        <button class="ctrl active" id="btn-play">▶ Démarrer</button>
+        <button class="ctrl" id="btn-pause">⏸ Pause</button>
+      </div>
+      <div style="display:flex; flex-wrap:wrap; gap:8px;">
+        <button class="ctrl" id="btn-reset-time">⟲ Temps</button>
+        <button class="ctrl" id="btn-reset-all">⟲ Système</button>
+      </div>
+      <select class="ctrl-select" id="speed-select">
+        <option value="0.25">Vitesse lente</option>
+        <option value="1" selected>Vitesse normale</option>
+        <option value="4">Vitesse rapide</option>
+        <option value="12">Vitesse très rapide</option>
+      </select>
+      <div class="cost-row" style="margin-left:0;">
+        <label for="cost-slider">Prix de l'électricité</label>
+        <input type="range" id="cost-slider" min="0" max="30" step="1" value="20">
+        <span class="cost-val" id="cost-val">0,20 €/kWh</span>
+      </div>
+      <label style="display:flex; align-items:center; gap:8px; margin-top:4px; cursor:pointer; font-size:12.5px; color:var(--text-dim);">
+        <input type="checkbox" id="advanced-toggle" style="width:16px;height:16px;accent-color:var(--wire-load);">
+        Notion avancée : puissance apparente (cos φ)
+      </label>
+    </div>
+  </div>
+  </div>
+  </div>
+
+  <div class="card">
+    <p class="eyebrow">Puissance en fonction du temps</p>
+    <canvas id="graph"></canvas>
+    <div class="graph-legend">
+      <span><span class="dot" style="background:var(--wire-load);"></span>Consommation nette</span>
+      <span><span class="dot" style="background:var(--wire-gen);"></span>Production nette</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  // ================= Appliance data =================
+  // Puissances : données constructeur réelles (W).
+  // eta : rendement indicatif (énergie utile / énergie reçue), ordre de grandeur pédagogique par catégorie — à ajuster si besoin.
+  // cosphi : facteur de puissance indicatif (1 = résistif pur ; <1 = moteur, ballast... — ordre de grandeur pédagogique, pas une donnée constructeur).
+  const APPLIANCES = [
+    {id:'fan', name:'Ventilateur', w:32, icon:'fan', group:'Ventilation & climatisation', eta:0.70, cosphi:0.68},
+    {id:'estarfan', name:'Ventilateur basse conso', w:27, icon:'fan', group:'Ventilation & climatisation', eta:0.82, cosphi:0.75},
+    {id:'airconditioner', name:'Climatiseur', w:620, icon:'ac', group:'Ventilation & climatisation', eta:0.30, cosphi:0.72},
+    {id:'estarairconditioner', name:'Climatiseur basse conso', w:560, icon:'ac', group:'Ventilation & climatisation', eta:0.38, cosphi:0.78},
+    {id:'waterheater', name:'Chauffe-eau', w:4500, icon:'heater', group:'Ventilation & climatisation', eta:0.95, cosphi:1},
+
+    {id:'incandescentbulb', name:'Ampoule à incandescence', w:100, icon:'bulb', group:'Éclairage', eta:0.05, cosphi:1},
+    {id:'cfbulb', name:'Ampoule fluocompacte', w:23, icon:'bulb', group:'Éclairage', eta:0.20, cosphi:0.55},
+    {id:'ledbulb', name:'Ampoule LED', w:15, icon:'bulb', group:'Éclairage', eta:0.90, cosphi:0.9},
+    {id:'fltubes', name:'Tubes fluorescents', w:160, icon:'tube', group:'Éclairage', adjustable:{increment:32, steps:5}, eta:0.50, cosphi:0.5},
+
+    {id:'fridge', name:'Réfrigérateur', w:300, icon:'fridge', group:'Cuisine', eta:0.35, cosphi:0.7},
+    {id:'estarfridge', name:'Réfrigérateur basse conso', w:247, icon:'fridge', group:'Cuisine', eta:0.45, cosphi:0.75},
+    {id:'microwave', name:'Four à micro-ondes', w:1700, icon:'microwave', group:'Cuisine', eta:0.55, cosphi:0.95},
+    {id:'toaster', name:'Grille-pain', w:1500, icon:'toaster', group:'Cuisine', eta:0.90, cosphi:1},
+    {id:'dishwasher', name:'Lave-vaisselle', w:1152, icon:'dishwasher', group:'Cuisine', eta:0.65, cosphi:0.75},
+    {id:'estardishwasher', name:'Lave-vaisselle basse conso', w:1080, icon:'dishwasher', group:'Cuisine', eta:0.72, cosphi:0.8},
+
+    {id:'iron', name:'Fer à repasser', w:1400, icon:'iron', group:'Linge & entretien', eta:0.95, cosphi:1},
+    {id:'hairdryer', name:'Sèche-cheveux', w:1000, icon:'hairdryer', group:'Linge & entretien', eta:0.85, cosphi:0.98},
+    {id:'vacuum', name:'Aspirateur', w:1440, icon:'vacuum', group:'Linge & entretien', eta:0.75, cosphi:0.65},
+    {id:'washer', name:'Lave-linge', w:1200, icon:'washer', group:'Linge & entretien', eta:0.70, cosphi:0.7},
+    {id:'estarwasher', name:'Lave-linge basse conso', w:840, icon:'washer', group:'Linge & entretien', eta:0.80, cosphi:0.78},
+
+    {id:'pc', name:'Ordinateur', w:156.6, icon:'pc', group:'Multimédia', eta:0.85, cosphi:0.7},
+    {id:'xbox360', name:'Console de jeux', w:176.5, icon:'console', group:'Multimédia', eta:0.80, cosphi:0.75},
+    {id:'tv40', name:'Téléviseur LCD 40"', w:214.4, icon:'tv', group:'Multimédia', eta:0.85, cosphi:0.8},
+    {id:'tv42', name:'Téléviseur plasma 42"', w:357.6, icon:'tv', group:'Multimédia', eta:0.80, cosphi:0.75},
+
+    {id:'evcar_lev1', name:'Voiture électrique (recharge)', w:1440, icon:'car', group:'Véhicule électrique', eta:0.90, cosphi:0.95},
+
+    {id:'solarmodule', name:'Module solaire', w:200, icon:'solar', group:'Production', generator:true, adjustable:{increment:100, steps:5}, daylight:true},
+    {id:'windturbine', name:'Éolienne domestique', w:600, icon:'wind', group:'Production', generator:true, adjustable:{increment:150, steps:4}, windy:true},
+  ];
+  const byId = {}; APPLIANCES.forEach(a=>byId[a.id]=a);
+  const GROUPS = [...new Set(APPLIANCES.map(a=>a.group))];
+
+  // ================= 5 load slots =================
+  const SLOT_POS = [
+    {x:700, y:78,  side:'right'},
+    {x:700, y:212, side:'right'},
+    {x:700, y:346, side:'right'},
+    {x:700, y:480, side:'right'},
+    {x:700, y:614, side:'right'},
+  ];
+  const DEFAULT_SELECTION = ['fan','solarmodule','pc','fridge','ledbulb'];
+
+  const slots = SLOT_POS.map((pos,i)=>({
+    pos,
+    applianceId: DEFAULT_SELECTION[i],
+    on: false,
+    level: 0, // offset steps for adjustable items
+  }));
+
+  // ================= Simulation state =================
+  let running = true;
+  let speedFactor = 1;
+  let simMinutes = 0;
+  let netEnergyWh = 0; // signed: + consumed from grid, - exported to grid
+  let usefulWh = 0;    // cumulative useful energy (consuming appliances only)
+  let lostWh = 0;      // cumulative lost energy (consuming appliances only)
+  let costSum = 0;     // signed euros
+  let price = 0.20;    // euros / kWh
+  let tripped = false;
+  let subscribedKVA = 3;
+  let advancedPowerMode = false; // cos φ / puissance apparente : notion Terminale, désactivée par défaut
+  const history = []; // {t: simMinutes, net}
+  const MAX_POINTS = 180;
+  let lastTs = null;
+  let lastSampleTs = null;
+  const SAMPLE_INTERVAL_MS = 200; // record at most 5 samples/second of real time
+
+  const SIM_MIN_PER_SEC_NORMAL = 4; // 1 real second = 4 simulated minutes at normal speed
+
+  function hourOfDay(){ return (simMinutes/60) % 24; }
+  function isDaytime(){ const h = hourOfDay(); return h>=6 && h<=18; }
+
+  function rawCurrentW(slot){
+    if(!slot.on) return 0;
+    const a = byId[slot.applianceId];
+    let w = a.w;
+    if(a.adjustable) w = a.w + a.adjustable.increment*slot.level;
+    if(a.daylight){
+      const h = hourOfDay();
+      let f = 0;
+      if(h>=6 && h<=18){
+        f = Math.sin(((h-6)/12)*Math.PI);
+      }
+      w = w*f;
+    }
+    if(a.windy){
+      let f = 0.5 + 0.3*Math.sin(simMinutes/37) + 0.15*Math.sin(simMinutes/13+1.3) + 0.1*Math.sin(simMinutes/5+0.6);
+      f = Math.max(0, Math.min(1, f));
+      w = w*f;
+    }
+    return Math.max(0,w);
+  }
+  function currentW(slot){
+    return tripped ? 0 : rawCurrentW(slot);
+  }
+  function isGenerator(slot){ return !!byId[slot.applianceId].generator; }
+  function cosPhi(applianceId){
+    if(!advancedPowerMode) return 1;
+    const a = byId[applianceId];
+    return (typeof a.cosphi==='number') ? a.cosphi : 1;
+  }
+  function rawApparentVA(slot){
+    const w = rawCurrentW(slot);
+    if(w<=0) return 0;
+    return w / cosPhi(slot.applianceId);
+  }
+  function apparentVA(slot){
+    return tripped ? 0 : rawApparentVA(slot);
+  }
+  function rawNetPowerW(){
+    return slots.reduce((sum,s)=>{
+      const w = rawCurrentW(s);
+      return sum + (isGenerator(s) ? -w : w);
+    },0);
+  }
+  function rawTotalApparentVA(){
+    return slots.reduce((sum,s)=>{
+      const va = rawApparentVA(s);
+      return sum + (isGenerator(s) ? -va : va);
+    },0);
+  }
+  function totalApparentVA(){
+    return tripped ? 0 : rawTotalApparentVA();
+  }
+
+  function usefulLost(slot){
+    const a = byId[slot.applianceId];
+    const w = currentW(slot);
+    if(isGenerator(slot) || w<=0) return {useful:0, lost:0};
+    const eta = typeof a.eta==='number' ? a.eta : 1;
+    const useful = w*eta;
+    return {useful, lost: w-useful};
+  }
+
+  function netPowerW(){
+    return slots.reduce((sum,s)=>{
+      const w = currentW(s);
+      return sum + (isGenerator(s) ? -w : w);
+    },0);
+  }
+
+  // ================= SVG scene =================
+  const svgNS="http://www.w3.org/2000/svg";
+  const scene = document.getElementById('scene');
+  function el(tag, attrs){
+    const e=document.createElementNS(svgNS,tag);
+    for(const k in attrs) e.setAttribute(k,attrs[k]);
+    return e;
+  }
+
+  const TOWER = {x:70, y:216};
+  const METER = {x:230, y:346};
+  const BREAKER = {x:430, y:346};
+
+  function buildScene(){
+    scene.innerHTML='';
+
+    // ---- Tower ----
+    const towerG = el('g',{});
+    towerG.appendChild(el('line',{x1:TOWER.x,y1:TOWER.y-70,x2:TOWER.x,y2:TOWER.y+40, stroke:'var(--border)','stroke-width':4}));
+    towerG.appendChild(el('line',{x1:TOWER.x-38,y1:TOWER.y-45,x2:TOWER.x+38,y2:TOWER.y-45, stroke:'var(--border)','stroke-width':4}));
+    towerG.appendChild(el('line',{x1:TOWER.x-24,y1:TOWER.y-15,x2:TOWER.x+24,y2:TOWER.y-15, stroke:'var(--border)','stroke-width':4}));
+    [-38,38].forEach(dx=>towerG.appendChild(el('line',{x1:TOWER.x+dx,y1:TOWER.y-45,x2:TOWER.x+dx*0.35,y2:TOWER.y+40, stroke:'var(--border)','stroke-width':3})));
+    scene.appendChild(towerG);
+    scene.appendChild(labelText(TOWER.x, TOWER.y+58, 'Réseau', 'node-title', 'middle'));
+
+    // wire tower -> meter
+    scene.appendChild(el('path',{d:`M${TOWER.x+40},${TOWER.y} C ${TOWER.x+90},${TOWER.y} ${METER.x-70},${METER.y} ${METER.x-34},${METER.y}`, class:'wire flowdash', id:'wire-main-1'}));
+
+    // ---- Meter (dial) ----
+    scene.appendChild(el('circle',{cx:METER.x,cy:METER.y,r:34, class:'meter-face'}));
+    for(let i=0;i<=8;i++){
+      const ang = Math.PI*0.75 + (Math.PI*1.5)*(i/8);
+      const x1=METER.x+26*Math.cos(ang), y1=METER.y+26*Math.sin(ang);
+      const x2=METER.x+31*Math.cos(ang), y2=METER.y+31*Math.sin(ang);
+      scene.appendChild(el('line',{x1,y1,x2,y2, class:'meter-tick'}));
+    }
+    const needle = el('line',{x1:METER.x,y1:METER.y,x2:METER.x,y2:METER.y-24, class:'meter-needle', id:'meter-needle'});
+    scene.appendChild(needle);
+    scene.appendChild(el('circle',{cx:METER.x,cy:METER.y,r:3.5, fill:'var(--text-dim)'}));
+    scene.appendChild(labelText(METER.x, METER.y-44, '', 'mono-label', 'middle', 'meter-kwh-label'));
+    scene.appendChild(labelText(METER.x, METER.y+52, 'Compteur', 'node-title','middle'));
+
+    // wire meter -> breaker
+    scene.appendChild(el('path',{d:`M${METER.x+34},${METER.y} L ${BREAKER.x-45},${BREAKER.y}`, class:'wire flowdash', id:'wire-main-2'}));
+
+    // ---- Breaker panel ----
+    const breakerGroup = el('g',{id:'breaker-group'});
+    breakerGroup.appendChild(el('rect',{x:BREAKER.x-45,y:BREAKER.y-55,width:90,height:110,rx:10, class:'node-fill'}));
+    for(let i=0;i<3;i++){
+      breakerGroup.appendChild(el('rect',{x:BREAKER.x-25,y:BREAKER.y-38+i*32,width:50,height:16,rx:3, fill:'var(--wire-off)', opacity:0.6, id:'breaker-switch-'+i}));
+    }
+    scene.appendChild(breakerGroup);
+    scene.appendChild(labelText(BREAKER.x, BREAKER.y+70, 'Tableau électrique', 'node-title','middle'));
+    scene.appendChild(labelText(BREAKER.x, BREAKER.y+86, '', 'mono-label','middle','breaker-status'));
+
+    const fo2 = el('foreignObject',{x:BREAKER.x-90, y:BREAKER.y+96, width:180, height:96});
+    fo2.appendChild(buildBreakerControls());
+    scene.appendChild(fo2);
+
+    // ---- Load slots ----
+    slots.forEach((slot,i)=>{
+      const {x,y} = slot.pos;
+      const midX = (BREAKER.x+45 + (x-70))/2;
+      const path = `M${BREAKER.x+45},${BREAKER.y} C ${midX},${BREAKER.y} ${midX},${y} ${x-70},${y}`;
+      const wire = el('path',{d:path, class:'wire flowdash', id:'wire-slot-'+i});
+      scene.appendChild(wire);
+
+      // rocker switch mid-wire
+      const swX = x-140, swY = y-14;
+      const swGroup = el('g',{class:'rocker-track', id:'rocker-'+i});
+      swGroup.appendChild(el('rect',{x:swX,y:swY,width:34,height:22,rx:11, class:'rocker-body'}));
+      const knob = el('circle',{cx:swX+11,cy:swY+11,r:8, class:'rocker-knob', id:'knob-'+i});
+      swGroup.appendChild(knob);
+      swGroup.addEventListener('click', ()=>{ slot.on=!slot.on; render(); });
+      scene.appendChild(swGroup);
+
+      // appliance icon box
+      scene.appendChild(el('rect',{x:x-68,y:y-26,width:60,height:52,rx:10, class:'node-fill'}));
+      const iconG = el('g',{id:'icon-'+i, class:'icon', style:'color:var(--text-dim)'});
+      iconG.appendChild(drawIcon(byId[slot.applianceId].icon, x-38, y));
+      scene.appendChild(iconG);
+
+      // controls (dropdown + readout + adjust) embedded to the right of the icon
+      const fo = el('foreignObject',{x:x-4, y:y-66, width:210, height:132});
+      fo.appendChild(buildSlotControls(i));
+      scene.appendChild(fo);
+      refreshAdjustRow(i);
+    });
+  }
+
+  function buildBreakerControls(){
+    const box = document.createElement('div');
+    box.className='slot-box';
+    box.style.gap='6px';
+    box.style.alignItems='stretch';
+
+    const label = document.createElement('div');
+    label.style.fontSize='10.5px';
+    label.style.color='var(--text-dim)';
+    label.textContent='Puissance souscrite';
+    box.appendChild(label);
+
+    const select = document.createElement('select');
+    [3,6,9,12,15,18,24,30,36].forEach(v=>{
+      const opt = document.createElement('option');
+      opt.value = v; opt.textContent = v+' kVA';
+      if(v===subscribedKVA) opt.selected = true;
+      select.appendChild(opt);
+    });
+    select.addEventListener('change', ()=>{
+      subscribedKVA = parseFloat(select.value);
+      render();
+    });
+    box.appendChild(select);
+
+    const btn = document.createElement('button');
+    btn.className = 'ctrl';
+    btn.id = 'btn-rearm';
+    btn.textContent = '🔌 Réarmer';
+    btn.style.fontSize = '11px';
+    btn.style.padding = '6px 8px';
+    btn.disabled = !tripped;
+    btn.addEventListener('click', ()=>{
+      if(!tripped) return;
+      tripped = false;
+      render();
+    });
+    box.appendChild(btn);
+
+    return box;
+  }
+
+  function buildSlotControls(i){
+    const slot = slots[i];
+    const box = document.createElement('div');
+    box.className='slot-box';
+    box.id='slotbox-'+i;
+
+    const select = document.createElement('select');
+    GROUPS.forEach(g=>{
+      const og = document.createElement('optgroup');
+      og.label = g;
+      APPLIANCES.filter(a=>a.group===g).forEach(a=>{
+        const opt = document.createElement('option');
+        opt.value = a.id; opt.textContent = a.name;
+        og.appendChild(opt);
+      });
+      select.appendChild(og);
+    });
+    select.value = slot.applianceId;
+    select.addEventListener('change', ()=>{
+      slot.applianceId = select.value;
+      slot.level = 0;
+      buildScene();
+      render();
+    });
+    box.appendChild(select);
+
+    const readoutRow = document.createElement('div');
+    readoutRow.className='slot-readout';
+    const wval = document.createElement('span');
+    wval.className='w-val';
+    wval.textContent='—';
+    readoutRow.appendChild(wval);
+    box.appendChild(readoutRow);
+
+    const a0 = byId[slot.applianceId];
+    if(!a0.generator){
+      const etaBar = document.createElement('div');
+      etaBar.className='eta-bar';
+      etaBar.id='etabar-'+i;
+      const segU = document.createElement('div'); segU.className='seg-useful';
+      const segL = document.createElement('div'); segL.className='seg-lost';
+      etaBar.appendChild(segU); etaBar.appendChild(segL);
+      box.appendChild(etaBar);
+
+      const etaRow = document.createElement('div');
+      etaRow.className='eta-row';
+      etaRow.id='etarow-'+i;
+      box.appendChild(etaRow);
+    }
+
+    const adjustRow = document.createElement('div');
+    adjustRow.className='adjust-row';
+    adjustRow.id='adjustrow-'+i;
+    box.appendChild(adjustRow);
+
+    return box;
+  }
+
+  function labelText(x,y,txt,cls,anchor,id){
+    const t = el('text',{x,y,'text-anchor':anchor||'start', class:cls});
+    if(id) t.setAttribute('id',id);
+    t.textContent = txt;
+    return t;
+  }
+
+  // ---- Icon shapes (original simple line-art, one per appliance category) ----
+  function drawIcon(type,cx,cy){
+    const g = el('g',{'stroke':'currentColor','fill':'none','stroke-width':1.8,'stroke-linecap':'round','stroke-linejoin':'round'});
+    function add(e){ g.appendChild(e); }
+    switch(type){
+      case 'fan':
+        add(el('circle',{cx,cy,r:2,fill:'currentColor'}));
+        for(let k=0;k<3;k++){
+          const ang = k*(2*Math.PI/3) - Math.PI/2;
+          add(el('path',{d:`M${cx},${cy} Q${cx+10*Math.cos(ang+0.5)},${cy+10*Math.sin(ang+0.5)} ${cx+13*Math.cos(ang)},${cy+13*Math.sin(ang)}`}));
+        }
+        break;
+      case 'ac':
+        add(el('rect',{x:cx-13,y:cy-8,width:26,height:16,rx:3}));
+        for(let k=-1;k<=1;k++) add(el('line',{x1:cx+k*7,y1:cy-4,x2:cx+k*7,y2:cy+4}));
+        break;
+      case 'heater':
+        add(el('path',{d:`M${cx},${cy-12} C${cx-9},${cy-2} ${cx-9},${cy+6} ${cx},${cy+12} C${cx+9},${cy+6} ${cx+9},${cy-2} ${cx},${cy-12} Z`}));
+        break;
+      case 'bulb':
+        add(el('circle',{cx,cy:cy-3,r:9}));
+        add(el('line',{x1:cx-4,y1:cy+6,x2:cx+4,y2:cy+6}));
+        add(el('line',{x1:cx-3,y1:cy+9,x2:cx+3,y2:cy+9}));
+        break;
+      case 'tube':
+        add(el('rect',{x:cx-15,y:cy-3,width:30,height:6,rx:3}));
+        add(el('rect',{x:cx-15,y:cy+6,width:30,height:6,rx:3}));
+        break;
+      case 'fridge':
+        add(el('rect',{x:cx-9,y:cy-13,width:18,height:26,rx:2}));
+        add(el('line',{x1:cx-9,y1:cy-2,x2:cx+9,y2:cy-2}));
+        add(el('line',{x1:cx+4,y1:cy-9,x2:cx+4,y2:cy-5}));
+        break;
+      case 'microwave':
+        add(el('rect',{x:cx-14,y:cy-9,width:28,height:18,rx:2}));
+        add(el('rect',{x:cx-9,y:cy-5,width:14,height:10,rx:1}));
+        add(el('circle',{cx:cx+9,cy:cy,r:1.6,fill:'currentColor'}));
+        break;
+      case 'toaster':
+        add(el('path',{d:`M${cx-13},${cy+8} L${cx-11},${cy-6} Q${cx-11},${cy-10} ${cx-7},${cy-10} L${cx+7},${cy-10} Q${cx+11},${cy-10} ${cx+11},${cy-6} L${cx+13},${cy+8} Z`}));
+        add(el('line',{x1:cx-4,y1:cy-10,x2:cx-4,y2:cy-14}));
+        add(el('line',{x1:cx+4,y1:cy-10,x2:cx+4,y2:cy-14}));
+        break;
+      case 'dishwasher':
+        add(el('rect',{x:cx-12,y:cy-13,width:24,height:26,rx:2}));
+        add(el('circle',{cx,cy:cy-6,r:3}));
+        add(el('line',{x1:cx-8,y1:cy+4,x2:cx+8,y2:cy+4}));
+        break;
+      case 'iron':
+        add(el('path',{d:`M${cx-12},${cy-4} Q${cx-13},${cy+8} ${cx-2},${cy+9} L${cx+11},${cy+7} Q${cx+14},${cy+2} ${cx+8},${cy-6} Z`}));
+        add(el('rect',{x:cx-6,y:cy-9,width:10,height:5,rx:1.5}));
+        break;
+      case 'hairdryer':
+        add(el('path',{d:`M${cx-13},${cy-3} L${cx+2},${cy-8} Q${cx+9},${cy-9} ${cx+9},${cy-2} Q${cx+9},${cy+5} ${cx+2},${cy+4} L${cx-13},${cy+1} Z`}));
+        add(el('path',{d:`M${cx-6},${cy+1} L${cx-9},${cy+11}`}));
+        break;
+      case 'vacuum':
+        add(el('rect',{x:cx-5,y:cy-11,width:10,height:14,rx:3}));
+        add(el('path',{d:`M${cx},${cy+3} Q${cx-2},${cy+12} ${cx-10},${cy+12}`}));
+        add(el('circle',{cx:cx-10,cy:cy+12,r:2}));
+        break;
+      case 'washer':
+        add(el('rect',{x:cx-12,y:cy-13,width:24,height:26,rx:3}));
+        add(el('circle',{cx,cy,r:7}));
+        add(el('circle',{cx,cy,r:3}));
+        break;
+      case 'pc':
+        add(el('rect',{x:cx-6,y:cy-13,width:13,height:26,rx:2}));
+        add(el('line',{x1:cx-3,y1:cy-8,x2:cx+4,y2:cy-8}));
+        add(el('circle',{cx:cx+0.5,cy:cy+7,r:1.4,fill:'currentColor'}));
+        break;
+      case 'console':
+        add(el('rect',{x:cx-14,y:cy-6,width:28,height:14,rx:7}));
+        add(el('line',{x1:cx-8,y1:cy-1,x2:cx-8,y2:cy+3}));
+        add(el('line',{x1:cx-10,y1:cy+1,x2:cx-6,y2:cy+1}));
+        add(el('circle',{cx:cx+7,cy:cy-1,r:1.4,fill:'currentColor'}));
+        add(el('circle',{cx:cx+10,cy:cy+2,r:1.4,fill:'currentColor'}));
+        break;
+      case 'tv':
+        add(el('rect',{x:cx-15,y:cy-11,width:30,height:18,rx:2}));
+        add(el('line',{x1:cx,y1:cy+7,x2:cx,y2:cy+11}));
+        add(el('line',{x1:cx-6,y1:cy+11,x2:cx+6,y2:cy+11}));
+        break;
+      case 'car':
+        add(el('path',{d:`M${cx-15},${cy+6} L${cx-12},${cy-4} Q${cx-10},${cy-8} ${cx-4},${cy-8} L${cx+6},${cy-8} Q${cx+11},${cy-8} ${cx+13},${cy-2} L${cx+15},${cy+6} Z`}));
+        add(el('circle',{cx:cx-8,cy:cy+7,r:2.6}));
+        add(el('circle',{cx:cx+8,cy:cy+7,r:2.6}));
+        break;
+      case 'solar':
+        add(el('rect',{x:cx-15,y:cy-10,width:30,height:20,rx:1}));
+        add(el('line',{x1:cx-5,y1:cy-10,x2:cx-5,y2:cy+10}));
+        add(el('line',{x1:cx+5,y1:cy-10,x2:cx+5,y2:cy+10}));
+        add(el('line',{x1:cx-15,y1:cy,x2:cx+15,y2:cy}));
+        break;
+      case 'wind':
+        add(el('line',{x1:cx,y1:cy+12,x2:cx,y2:cy-9}));
+        add(el('circle',{cx,cy:cy-9,r:1.6,fill:'currentColor'}));
+        for(let k=0;k<3;k++){
+          const ang = k*(2*Math.PI/3) - Math.PI/2;
+          add(el('path',{d:`M${cx},${cy-9} Q${cx+8*Math.cos(ang+0.45)},${cy-9+8*Math.sin(ang+0.45)} ${cx+11*Math.cos(ang)},${cy-9+11*Math.sin(ang)}`}));
+        }
+        break;
+    }
+    return g;
+  }
+
+  // ================= Rendering / state sync =================
+  function fmtEUR(x){
+    const sign = x<0 ? '−' : '';
+    return sign + Math.abs(x).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €';
+  }
+  function fmtTime(mins){
+    const day = Math.floor(mins/(60*24))+1;
+    const h = Math.floor(mins/60)%24;
+    const m = Math.floor(mins%60);
+    return `Jour ${day}, ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+  }
+
+  function updateDayNightIcon(){
+    const icon = document.getElementById('daynight-icon');
+    if(!icon) return;
+    if(isDaytime()){
+      icon.innerHTML = `
+        <circle cx="8" cy="8" r="3.2" fill="#ffb445"/>
+        <g stroke="#ffb445" stroke-width="1.3" stroke-linecap="round">
+          <line x1="8" y1="1" x2="8" y2="2.6"/>
+          <line x1="8" y1="13.4" x2="8" y2="15"/>
+          <line x1="1" y1="8" x2="2.6" y2="8"/>
+          <line x1="13.4" y1="8" x2="15" y2="8"/>
+          <line x1="3.1" y1="3.1" x2="4.2" y2="4.2"/>
+          <line x1="11.8" y1="11.8" x2="12.9" y2="12.9"/>
+          <line x1="3.1" y1="12.9" x2="4.2" y2="11.8"/>
+          <line x1="11.8" y1="4.2" x2="12.9" y2="3.1"/>
+        </g>`;
+    } else {
+      icon.innerHTML = `<path d="M 10.5 2.5 A 6 6 0 1 0 10.5 13.5 A 7.2 7.2 0 0 1 10.5 2.5 Z" fill="#8890b5"/>`;
+    }
+  }
+
+  function render(){
+    if(!tripped){
+      const rawS = rawTotalApparentVA();
+      if(rawS > subscribedKVA*1000) tripped = true;
+    }
+
+    slots.forEach((slot,i)=>{
+      const a = byId[slot.applianceId];
+      const w = currentW(slot);
+      const gen = isGenerator(slot);
+      const cut = tripped && slot.on;
+
+      const wire = document.getElementById('wire-slot-'+i);
+      wire.classList.remove('load-on','gen-on','run');
+      if(slot.on && !tripped){
+        wire.classList.add(gen? 'gen-on':'load-on');
+        if(running) wire.classList.add('run');
+      }
+
+      const knob = document.getElementById('knob-'+i);
+      knob.classList.toggle('on', slot.on);
+      knob.classList.toggle('gen', gen);
+      knob.setAttribute('cx', slot.on ? (parseFloat(knob.getAttribute('cx'))) : knob.getAttribute('cx'));
+      // move knob horizontally by toggling transform
+      const track = knob.closest('g');
+      const rectEl = track.querySelector('rect');
+      const trackX = parseFloat(rectEl.getAttribute('x'));
+      knob.setAttribute('cx', slot.on ? trackX+23 : trackX+11);
+
+      const iconEl = document.getElementById('icon-'+i);
+      iconEl.classList.toggle('on', slot.on && !tripped);
+
+      // sync slot-box UI
+      const box = document.getElementById('slotbox-'+i);
+      if(box){
+        box.querySelector('.w-val').textContent = cut ? 'Coupé' : (slot.on ? (gen? '+' : '') + Math.round(w).toLocaleString('fr-FR') + ' W' : '—');
+        box.querySelector('.w-val').className = 'w-val ' + (cut ? 'cut' : (!slot.on ? 'off' : (gen?'gen':'load')));
+        box.querySelector('select').value = slot.applianceId;
+
+        const etaBar = document.getElementById('etabar-'+i);
+        const etaRow = document.getElementById('etarow-'+i);
+        if(etaBar && etaRow){
+          const {useful, lost} = usefulLost(slot);
+          const pctU = a.eta*100;
+          etaBar.children[0].style.width = pctU + '%';
+          etaBar.children[1].style.width = (100-pctU) + '%';
+          etaRow.innerHTML = '';
+          const cphi = cosPhi(slot.applianceId);
+          if(slot.on){
+            const spanU = document.createElement('span'); spanU.style.color='var(--useful)';
+            spanU.textContent = 'Utile ' + Math.round(useful) + ' W';
+            const spanL = document.createElement('span'); spanL.style.color='var(--lost)';
+            spanL.textContent = 'Perdue ' + Math.round(lost) + ' W';
+            etaRow.appendChild(spanU); etaRow.appendChild(spanL);
+          } else {
+            const spanEta = document.createElement('span');
+            spanEta.textContent = 'η = ' + Math.round(pctU) + ' %';
+            etaRow.appendChild(spanEta);
+          }
+          if(advancedPowerMode){
+            const spanCphi = document.createElement('span');
+            spanCphi.style.color = 'var(--text-dim)';
+            spanCphi.textContent = 'cos φ ' + cphi.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2});
+            etaRow.appendChild(spanCphi);
+          }
+        }
+      }
+    });
+
+    const mw1 = document.getElementById('wire-main-1');
+    const mw2 = document.getElementById('wire-main-2');
+    const anyLoad = !tripped && slots.some(s=>s.on && !isGenerator(s));
+    const anyGen = !tripped && slots.some(s=>s.on && isGenerator(s));
+    [mw1,mw2].forEach(w=>{
+      w.classList.remove('load-on','gen-on','run');
+      if(anyLoad || anyGen){
+        w.classList.add(anyLoad ? 'load-on' : 'gen-on');
+        if(running) w.classList.add('run');
+      }
+    });
+
+    const net = netPowerW();
+    const needle = document.getElementById('meter-needle');
+    const maxScale = 6000;
+    const clamped = Math.max(-maxScale, Math.min(maxScale, net));
+    const angleDeg = (clamped/maxScale) * 100; // +-100° from vertical
+    const angleRad = angleDeg * Math.PI/180;
+    const needleLen = 24;
+    needle.setAttribute('x1', METER.x);
+    needle.setAttribute('y1', METER.y);
+    needle.setAttribute('x2', METER.x + needleLen*Math.sin(angleRad));
+    needle.setAttribute('y2', METER.y - needleLen*Math.cos(angleRad));
+    needle.classList.toggle('neg', net<0);
+
+    const powerEl = document.getElementById('v-power');
+    powerEl.textContent = (net>=0?'+':'−') + Math.abs(Math.round(net)).toLocaleString('fr-FR') + ' W';
+    powerEl.className = 'v ' + (net>=0 ? 'load':'gen');
+
+    const S = totalApparentVA();
+    const apparentEl = document.getElementById('v-apparent');
+    apparentEl.textContent = (S/1000).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' kVA';
+    apparentEl.className = 'v';
+    const cellApparent = document.getElementById('cell-apparent');
+    if(cellApparent) cellApparent.style.display = advancedPowerMode ? '' : 'none';
+    const labelPower = document.getElementById('label-power');
+    if(labelPower) labelPower.textContent = advancedPowerMode ? 'Puissance active (P)' : 'Puissance consommée';
+
+    const kwh = netEnergyWh/1000;
+    document.getElementById('v-energy').textContent = (kwh>=0?'':'−') + Math.abs(kwh).toLocaleString('fr-FR',{minimumFractionDigits:3,maximumFractionDigits:3}) + ' kWh';
+    document.getElementById('meter-kwh-label').textContent = (kwh>=0?'':'−') + Math.abs(kwh).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' kWh';
+
+    document.getElementById('v-cost').textContent = fmtEUR(costSum);
+    document.getElementById('v-time').textContent = fmtTime(simMinutes);
+    updateDayNightIcon();
+    document.getElementById('v-useful').textContent = (usefulWh/1000).toLocaleString('fr-FR',{minimumFractionDigits:3,maximumFractionDigits:3}) + ' kWh';
+    document.getElementById('v-lost').textContent = (lostWh/1000).toLocaleString('fr-FR',{minimumFractionDigits:3,maximumFractionDigits:3}) + ' kWh';
+
+    // ---- Breaker / trip state ----
+    const breakerGroup = document.getElementById('breaker-group');
+    const breakerStatus = document.getElementById('breaker-status');
+    const rearmBtn = document.getElementById('btn-rearm');
+    const banner = document.getElementById('trip-banner');
+    if(breakerGroup) breakerGroup.classList.toggle('breaker-tripped', tripped);
+    for(let i=0;i<3;i++){
+      const sw = document.getElementById('breaker-switch-'+i);
+      if(sw) sw.setAttribute('fill', tripped ? 'var(--danger)' : 'var(--wire-off)');
+    }
+    if(breakerStatus){
+      breakerStatus.textContent = tripped ? '⚠ DÉCLENCHÉ' : '';
+      breakerStatus.style.fill = 'var(--danger)';
+    }
+    if(rearmBtn) rearmBtn.disabled = !tripped;
+    if(banner){
+      if(tripped){
+        const rawS = rawTotalApparentVA();
+        const rawP = rawNetPowerW();
+        banner.style.display = 'block';
+        if(advancedPowerMode){
+          banner.textContent = `⚠ Disjoncteur déclenché : les appareils allumés appellent une puissance apparente de ${Math.round(rawS).toLocaleString('fr-FR')} VA (pour ${Math.round(rawP).toLocaleString('fr-FR')} W de puissance active), au-delà de la puissance souscrite (${(subscribedKVA*1000).toLocaleString('fr-FR')} VA). Éteignez des appareils, puis réarmez le disjoncteur.`;
+        } else {
+          banner.textContent = `⚠ Disjoncteur déclenché : les appareils allumés appellent ${Math.round(rawP).toLocaleString('fr-FR')} W, au-delà de la puissance souscrite (${(subscribedKVA*1000).toLocaleString('fr-FR')} W). Éteignez des appareils, puis réarmez le disjoncteur.`;
+        }
+      } else {
+        banner.style.display = 'none';
+      }
+    }
+  }
+
+  function refreshAdjustRow(i, rowEl){
+    rowEl = rowEl || document.getElementById('adjustrow-'+i);
+    rowEl.innerHTML='';
+    const slot = slots[i];
+    const a = byId[slot.applianceId];
+    if(!a.adjustable) return;
+    const minus = document.createElement('button'); minus.textContent='−';
+    const plus = document.createElement('button'); plus.textContent='+';
+    const span = document.createElement('span'); span.textContent = '×' + (slot.level+1);
+    minus.addEventListener('click', ()=>{ slot.level = Math.max(0, slot.level-1); span.textContent='×'+(slot.level+1); render(); });
+    plus.addEventListener('click', ()=>{ slot.level = Math.min(a.adjustable.steps, slot.level+1); span.textContent='×'+(slot.level+1); render(); });
+    rowEl.appendChild(minus); rowEl.appendChild(span); rowEl.appendChild(plus);
+  }
+
+  function rebuildIconFor(i){
+    const slot = slots[i];
+    const iconG = document.getElementById('icon-'+i);
+    iconG.innerHTML='';
+    iconG.appendChild(drawIcon(byId[slot.applianceId].icon, slot.pos.x-38, slot.pos.y));
+    refreshAdjustRow(i);
+  }
+
+  // ================= Graph =================
+  const canvas = document.getElementById('graph');
+  const ctx = canvas.getContext('2d');
+  function resizeCanvas(){
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width*devicePixelRatio;
+    canvas.height = rect.height*devicePixelRatio;
+    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  }
+  window.addEventListener('resize', resizeCanvas);
+
+  function drawGraph(){
+    const w = canvas.getBoundingClientRect().width;
+    const h = canvas.getBoundingClientRect().height;
+    ctx.clearRect(0,0,w,h);
+    if(history.length<2) return;
+
+    const padL = 46, padR = 10, padT = 10, padB = 22;
+    const plotW = w - padL - padR;
+    const plotH = h - padT - padB;
+
+    const tMin = history[0].t, tMax = history[history.length-1].t;
+    const tSpan = Math.max(1, tMax - tMin);
+    const maxAbs = Math.max(300, ...history.map(p=>Math.abs(p.net))) * 1.15;
+
+    const xOf = (t)=> padL + ((t - tMin)/tSpan) * plotW;
+    const yOf = (net)=> padT + plotH/2 - (net/maxAbs) * (plotH/2);
+    const zeroY = yOf(0);
+
+    const styles = getComputedStyle(document.documentElement);
+    const borderColor = styles.getPropertyValue('--border').trim();
+    const dimColor = styles.getPropertyValue('--text-dim').trim();
+    const loadColor = styles.getPropertyValue('--wire-load').trim();
+    const genColor = styles.getPropertyValue('--wire-gen').trim();
+
+    // horizontal gridlines (power) + labels
+    ctx.font = '10px JetBrains Mono, monospace';
+    ctx.fillStyle = dimColor;
+    ctx.strokeStyle = borderColor;
+    ctx.lineWidth = 1;
+    const steps = 4;
+    for(let i=-steps;i<=steps;i++){
+      const val = (maxAbs/steps)*i;
+      const y = yOf(val);
+      ctx.globalAlpha = i===0 ? 0.9 : 0.35;
+      ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(w-padR,y); ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.textAlign='right'; ctx.textBaseline='middle';
+      ctx.fillText(Math.round(val).toLocaleString('fr-FR'), padL-6, y);
+    }
+
+    // vertical gridlines (time, in simulated hours) + labels
+    const hourSpanTotal = tSpan/60;
+    const hourStep = hourSpanTotal<=2 ? 0.25 : hourSpanTotal<=6 ? 0.5 : hourSpanTotal<=12 ? 1 : 2;
+    const firstHour = Math.ceil((tMin/60)/hourStep)*hourStep;
+    ctx.textAlign='center'; ctx.textBaseline='top';
+    for(let hr=firstHour; hr*60<=tMax; hr+=hourStep){
+      const x = xOf(hr*60);
+      ctx.globalAlpha = 0.25;
+      ctx.beginPath(); ctx.moveTo(x,padT); ctx.lineTo(x,h-padB); ctx.stroke();
+      ctx.globalAlpha = 1;
+      const label = (hourStep<1 ? hr.toFixed(2) : Math.round(hr)) + ' h';
+      ctx.fillStyle = dimColor;
+      ctx.fillText(label, x, h-padB+4);
+    }
+
+    // filled area, split by sign
+    function fillRegion(predicatePositive){
+      ctx.beginPath();
+      let started = false;
+      history.forEach((p,i)=>{
+        const x = xOf(p.t);
+        const val = predicatePositive ? Math.max(0,p.net) : Math.min(0,p.net);
+        const y = yOf(val);
+        if(!started){ ctx.moveTo(x, zeroY); started=true; }
+        ctx.lineTo(x,y);
+      });
+      ctx.lineTo(xOf(history[history.length-1].t), zeroY);
+      ctx.closePath();
+      ctx.fillStyle = predicatePositive ? loadColor : genColor;
+      ctx.globalAlpha = 0.22;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    fillRegion(true);
+    fillRegion(false);
+
+    // net power line, colored per segment sign
+    ctx.lineWidth = 2;
+    for(let i=1;i<history.length;i++){
+      const p0=history[i-1], p1=history[i];
+      ctx.beginPath();
+      ctx.moveTo(xOf(p0.t), yOf(p0.net));
+      ctx.lineTo(xOf(p1.t), yOf(p1.net));
+      ctx.strokeStyle = p1.net>=0 ? loadColor : genColor;
+      ctx.stroke();
+    }
+  }
+
+  // ================= Time loop =================
+  function tick(ts){
+    if(lastTs===null) lastTs=ts;
+    const dtSec = (ts-lastTs)/1000;
+    lastTs = ts;
+
+    if(running){
+      const dtMin = dtSec * SIM_MIN_PER_SEC_NORMAL * speedFactor;
+      simMinutes += dtMin;
+      const net = netPowerW();
+      netEnergyWh += net * (dtMin/60);
+      costSum += net*(dtMin/60)/1000 * price;
+      slots.forEach(s=>{
+        const {useful, lost} = usefulLost(s);
+        usefulWh += useful * (dtMin/60);
+        lostWh += lost * (dtMin/60);
+      });
+
+      if(lastSampleTs===null || ts-lastSampleTs >= SAMPLE_INTERVAL_MS){
+        lastSampleTs = ts;
+        history.push({t:simMinutes, net});
+        if(history.length>MAX_POINTS) history.shift();
+      }
+
+      render();
+      drawGraph();
+    }
+    requestAnimationFrame(tick);
+  }
+
+  // ================= Controls wiring =================
+  document.getElementById('btn-play').addEventListener('click', ()=>{
+    running=true;
+    document.getElementById('btn-play').classList.add('active');
+    document.getElementById('btn-pause').classList.remove('active');
+    render();
+  });
+  document.getElementById('btn-pause').addEventListener('click', ()=>{
+    running=false;
+    document.getElementById('btn-pause').classList.add('active');
+    document.getElementById('btn-play').classList.remove('active');
+    render();
+  });
+  document.getElementById('btn-reset-time').addEventListener('click', ()=>{
+    simMinutes=0; netEnergyWh=0; costSum=0; history.length=0; lastSampleTs=null;
+    render(); drawGraph();
+  });
+  document.getElementById('btn-reset-all').addEventListener('click', ()=>{
+    simMinutes=0; netEnergyWh=0; costSum=0; usefulWh=0; lostWh=0; history.length=0; lastSampleTs=null;
+    slots.forEach((s,i)=>{ s.applianceId=DEFAULT_SELECTION[i]; s.on = false; s.level=0; });
+    document.getElementById('cost-slider').value=20;
+    price=0.20;
+    document.getElementById('cost-val').textContent='0,20 €/kWh';
+    tripped=false;
+    subscribedKVA=3;
+    buildScene();
+    render(); drawGraph();
+  });
+  function updateFlowSpeed(){
+    const base = 0.6; // seconds, at normal speed (factor 1)
+    const duration = Math.max(0.08, base/speedFactor);
+    document.documentElement.style.setProperty('--flow-duration', duration+'s');
+  }
+
+  document.getElementById('speed-select').addEventListener('change',(e)=>{
+    speedFactor = parseFloat(e.target.value);
+    updateFlowSpeed();
+  });
+  document.getElementById('cost-slider').addEventListener('input',(e)=>{
+    price = parseInt(e.target.value,10)/100;
+    document.getElementById('cost-val').textContent = price.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €/kWh';
+  });
+  document.getElementById('advanced-toggle').addEventListener('change',(e)=>{
+    advancedPowerMode = e.target.checked;
+    render();
+  });
+
+  // ================= Init =================
+  buildScene();
+  resizeCanvas();
+  render();
+  drawGraph();
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
